@@ -107,7 +107,7 @@ Get-FileHash .\Phase-Setup-*.exe -Algorithm SHA256
 
 If the hash does not match, do not run the file.
 
-**Why Windows may warn you.** The installer is not code-signed yet, so SmartScreen may show "Windows protected your PC" for a new file without reputation. The warning alone does not mean the file is harmful. Check the hash, then use *More info* → *Run anyway*. Signing through the [SignPath Foundation](https://signpath.org) program is planned.
+**Why Windows may warn you.** The installer is not code-signed yet, so SmartScreen may show "Windows protected your PC" for a new file without reputation. The warning alone does not mean the file is harmful. Check the hash, then use *More info* → *Run anyway*. Signing through the [SignPath Foundation](https://signpath.org) program is being set up, see the [code signing policy](#code-signing-policy).
 
 **What the installer does.** It installs Phase into your user folder (`%LOCALAPPDATA%\Programs\Phase`) with a shortcut and an uninstaller. No administrator rights, no bundled programs. The only download it may make is WebView2 from Microsoft, with your consent and after checking its signature.
 
@@ -120,7 +120,9 @@ If the hash does not match, do not run the file.
 | launcher files, taking only the in-game name | mods, when you start a sync or install; extras move to `mods\.phase-backup` | install other programs |
 | world names and icons, files in the `mods` folder | the `phase://` link handler, and autostart only if you turn it on | give players operator rights |
 
-**What data goes where.** Phase has no accounts, analytics or telemetry.
+### What data goes where
+
+Phase has no accounts, analytics or telemetry.
 
 - **Your PC.** `%LOCALAPPDATA%\Phase` holds your device key (encrypted with Windows DPAPI), nickname, allowed devices, a mod hash cache and session reports. Nothing from it is sent to the developer.
 - **Other players.** Room participants see your nickname and device ID. A direct connection reveals participants' IP addresses to each other. Guests receive the list of mods the host shares.
@@ -131,6 +133,19 @@ If the hash does not match, do not run the file.
 To remove your data, tick the data option in the uninstaller or delete `%LOCALAPPDATA%\Phase`.
 
 Found a vulnerability? Please report it privately, see [SECURITY.md](SECURITY.md).
+
+## Code signing policy
+
+**Status.** Phase LAN has applied for free code signing from the [SignPath Foundation](https://signpath.org), with a certificate provided by [SignPath.io](https://about.signpath.io). The application is in progress: current releases, 1.0.2 included, are not signed yet. Until signing is in place, check the SHA-256 of every download as described above.
+
+**What is signed.** Only files built from this open repository, [phase-mc/phase-lan](https://github.com/phase-mc/phase-lan): the installer `Phase-Setup-<version>.exe` and the `Phase.exe` it installs. They are built exclusively by the public [release workflow](.github/workflows/release.yml) on GitHub Actions from a version tag, and its log is open to everyone. Nothing built on a personal computer is ever submitted for signing.
+
+**Roles.**
+
+- Committers and reviewers: the [members](https://github.com/orgs/phase-mc/people) of the phase-mc organization. Changes from outside contributors go through a pull request reviewed by a member.
+- Approver: **phasecompany**, the maintainer. Every signing request is approved manually by the maintainer after checking that it comes from the release workflow and the expected tag.
+
+**Privacy.** Phase LAN does not collect analytics or telemetry. The network connections it makes and the data each one carries are listed in [What data goes where](#what-data-goes-where).
 
 ## Build from source
 
