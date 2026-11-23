@@ -35,7 +35,7 @@ jobs:
     name: Build and publish
     runs-on: windows-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Check that the tag matches the version in Cargo.toml
         id: version
@@ -52,7 +52,7 @@ jobs:
           "version=$version" >> $env:GITHUB_OUTPUT
 
       - uses: dtolnay/rust-toolchain@stable
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: 22
           cache: npm
@@ -70,7 +70,7 @@ jobs:
       - name: Upload Phase.exe for signing
         id: upload-app
         if: env.SIGNING == 'true'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: phase-exe-unsigned
           path: target/release/Phase.exe
@@ -78,8 +78,9 @@ jobs:
 
       - name: Sign Phase.exe
         if: env.SIGNING == 'true'
-        uses: signpath/github-action-submit-signing-request@v1
+        uses: signpath/github-action-submit-signing-request@v2
         with:
+          connector-url: https://githubactions.connectors.signpath.io
           api-token: ${{ secrets.SIGNPATH_API_TOKEN }}
           organization-id: ${{ vars.SIGNPATH_ORGANIZATION_ID }}
           project-slug: ${{ vars.SIGNPATH_PROJECT_SLUG }}
@@ -102,7 +103,7 @@ jobs:
       - name: Upload the installer for signing
         id: upload-setup
         if: env.SIGNING == 'true'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: phase-setup-unsigned
           path: dist/Phase-Setup-${{ steps.version.outputs.version }}.exe
@@ -110,8 +111,9 @@ jobs:
 
       - name: Sign the installer
         if: env.SIGNING == 'true'
-        uses: signpath/github-action-submit-signing-request@v1
+        uses: signpath/github-action-submit-signing-request@v2
         with:
+          connector-url: https://githubactions.connectors.signpath.io
           api-token: ${{ secrets.SIGNPATH_API_TOKEN }}
           organization-id: ${{ vars.SIGNPATH_ORGANIZATION_ID }}
           project-slug: ${{ vars.SIGNPATH_PROJECT_SLUG }}

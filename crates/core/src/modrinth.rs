@@ -21,8 +21,6 @@ use crate::options::ModrinthSource;
 
 // Phase Client: profile (pack) requests — latest version, search, SHA-512 downloads.
 #[cfg(feature = "client")]
-mod packs;
-#[cfg(feature = "client")]
 pub use packs::SearchHit;
 #[cfg(feature = "client")]
 pub(crate) use packs::{Latest, sha512_file};

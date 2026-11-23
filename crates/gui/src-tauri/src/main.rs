@@ -12,8 +12,6 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 mod autoroom;
-#[cfg(feature = "client")]
-mod client;
 mod codes;
 mod commands;
 mod harden;

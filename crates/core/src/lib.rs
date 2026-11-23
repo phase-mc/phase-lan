@@ -28,14 +28,10 @@
 //! ```
 
 mod approval;
-#[cfg(feature = "client")]
-pub mod client_profiles;
 pub mod companion;
 pub mod entitlement;
 pub mod events;
 mod follow;
-#[cfg(feature = "client")]
-pub mod game;
 mod guest;
 mod host;
 pub mod logs;
@@ -44,10 +40,6 @@ mod modrinth;
 pub mod modsync;
 mod names;
 mod options;
-#[cfg(feature = "client")]
-pub mod pack_mods;
-#[cfg(feature = "client")]
-pub mod profile_install;
 pub mod profiles;
 pub mod reports;
 mod room;

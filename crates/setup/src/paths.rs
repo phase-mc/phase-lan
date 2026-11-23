@@ -50,8 +50,17 @@ pub fn normalized(path: &Path) -> String {
     text.trim_end_matches('\\').to_lowercase()
 }
 
+/// The same file or folder. Text first; when it differs and both exist, the file system decides:
+/// one side may use short 8.3 names (`C:\Users\RUNNER~1\...`, a short TEMP) while a shortcut
+/// stores the long form of the same path.
 pub fn same_path(a: &Path, b: &Path) -> bool {
-    normalized(a) == normalized(b)
+    if normalized(a) == normalized(b) {
+        return true;
+    }
+    match (std::fs::canonicalize(a), std::fs::canonicalize(b)) {
+        (Ok(a), Ok(b)) => normalized(&a) == normalized(&b),
+        _ => false,
+    }
 }
 
 /// `path` lies inside `parent` (is not equal to it).
