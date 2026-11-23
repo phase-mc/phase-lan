@@ -1,0 +1,38 @@
+[package]
+name = "phase-tunnel"
+description = "Phase: encrypted channel between players (iroh) and TCP/UDP forwarding"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[dependencies]
+phase-lang = { path = "../lang" }
+anyhow = "1.0.104"
+# Integrity check of a mod downloaded from the host (mods.rs).
+blake3 = "1.8.7"
+bytes = "1"
+iroh.workspace = true
+iroh-tickets.workspace = true
+phase-netstat = { path = "../netstat" }
+n0-future = "0.3"
+# Reading our own relay's certificate (PEM); already used inside iroh.
+rustls-pki-types = "1.15"
+serde = { version = "1.0.229", features = ["derive"] }
+serde_json = "1.0.154"
+socket2 = "0.6"
+tokio = { version = "1.54.1", features = ["full"] }
+tracing = "0.1.44"
+# Wiping key copies from memory after use (already used inside iroh).
+zeroize = "1.9"
+
+[dev-dependencies]
+# Our own relay server for automated tests (started inside the test on 127.0.0.1).
+phase-relay = { path = "../relay" }
+
+[target.'cfg(windows)'.dependencies]
+windows-sys = { version = "0.61", features = [
+    "Win32_Foundation",
+    "Win32_Networking_WinSock",
+    "Win32_Security_Cryptography",
+] }

@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Report a security vulnerability
+    url: https://github.com/phase-mc/phase-lan/security/advisories/new
+    about: Please report security problems privately, not in a public issue.
+  - name: Help and questions
+    url: https://phase.yeskendir.com/lan/
+    about: How Phase works, safety and common questions.

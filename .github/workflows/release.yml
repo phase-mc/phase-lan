@@ -1,0 +1,184 @@
+name: Release
+
+# Builds the window and the installer from a version tag (v1.2.3) and publishes a GitHub Release
+# with Phase-Setup-<version>.exe and release.json (size and SHA-256).
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  CARGO_TERM_COLOR: always
+  CARGO_INCREMENTAL: "0"
+  # Code signing through SignPath Foundation (https://signpath.org) is off until the project is
+  # accepted. To turn it on, the owner sets up the following in the repository settings:
+  #   1. Apply to SignPath Foundation, install the SignPath GitHub App for this repository and
+  #      create a project with a "release-signing" signing policy and an artifact configuration
+  #      that signs a single PE file inside the uploaded artifact (zip).
+  #   2. Secret   SIGNPATH_API_TOKEN       - API token of a SignPath CI user that may submit
+  #                                          signing requests for the project.
+  #   3. Variable SIGNPATH_ORGANIZATION_ID - the organization ID shown in SignPath.
+  #   4. Variable SIGNPATH_PROJECT_SLUG    - the project slug, for example "phase-lan".
+  #   5. Variable SIGNPATH_POLICY_SLUG     - the signing policy slug, for example "release-signing".
+  #   6. Variable SIGNPATH_ENABLED         - "true".
+  # Phase.exe is signed before it is embedded into the installer, then the installer itself.
+  SIGNING: ${{ vars.SIGNPATH_ENABLED == 'true' }}
+
+jobs:
+  release:
+    name: Build and publish
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check that the tag matches the version in Cargo.toml
+        id: version
+        shell: pwsh
+        run: |
+          $toml = Get-Content -Raw Cargo.toml
+          if ($toml -notmatch '(?ms)^\[workspace\.package\].*?^version\s*=\s*"([^"]+)"') {
+            throw 'No version in Cargo.toml'
+          }
+          $version = $Matches[1]
+          if ("v$version" -ne $env:GITHUB_REF_NAME) {
+            throw "Tag $env:GITHUB_REF_NAME does not match version $version in Cargo.toml"
+          }
+          "version=$version" >> $env:GITHUB_OUTPUT
+
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: crates/gui/package-lock.json
+
+      - name: Install window dependencies
+        working-directory: crates/gui
+        run: npm ci --no-audit --no-fund
+
+      - name: Build Phase.exe
+        working-directory: crates/gui
+        run: npx tauri build --no-bundle
+
+      # --- Optional: sign Phase.exe -------------------------------------------------------
+      - name: Upload Phase.exe for signing
+        id: upload-app
+        if: env.SIGNING == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: phase-exe-unsigned
+          path: target/release/Phase.exe
+          if-no-files-found: error
+
+      - name: Sign Phase.exe
+        if: env.SIGNING == 'true'
+        uses: signpath/github-action-submit-signing-request@v1
+        with:
+          api-token: ${{ secrets.SIGNPATH_API_TOKEN }}
+          organization-id: ${{ vars.SIGNPATH_ORGANIZATION_ID }}
+          project-slug: ${{ vars.SIGNPATH_PROJECT_SLUG }}
+          signing-policy-slug: ${{ vars.SIGNPATH_POLICY_SLUG }}
+          github-artifact-id: ${{ steps.upload-app.outputs.artifact-id }}
+          wait-for-completion: true
+          output-artifact-directory: signed-app
+
+      - name: Use the signed Phase.exe
+        if: env.SIGNING == 'true'
+        shell: pwsh
+        run: Copy-Item -Force signed-app/Phase.exe target/release/Phase.exe
+
+      # --- Installer ----------------------------------------------------------------------
+      - name: Build the installer
+        shell: pwsh
+        run: ./tools/build-setup.ps1 -AppExe target/release/Phase.exe
+
+      # --- Optional: sign the installer ---------------------------------------------------
+      - name: Upload the installer for signing
+        id: upload-setup
+        if: env.SIGNING == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: phase-setup-unsigned
+          path: dist/Phase-Setup-${{ steps.version.outputs.version }}.exe
+          if-no-files-found: error
+
+      - name: Sign the installer
+        if: env.SIGNING == 'true'
+        uses: signpath/github-action-submit-signing-request@v1
+        with:
+          api-token: ${{ secrets.SIGNPATH_API_TOKEN }}
+          organization-id: ${{ vars.SIGNPATH_ORGANIZATION_ID }}
+          project-slug: ${{ vars.SIGNPATH_PROJECT_SLUG }}
+          signing-policy-slug: ${{ vars.SIGNPATH_POLICY_SLUG }}
+          github-artifact-id: ${{ steps.upload-setup.outputs.artifact-id }}
+          wait-for-completion: true
+          output-artifact-directory: signed-setup
+
+      - name: Use the signed installer
+        if: env.SIGNING == 'true'
+        shell: pwsh
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          $name = "Phase-Setup-$env:VERSION.exe"
+          Copy-Item -Force "signed-setup/$name" "dist/$name"
+          $check = Start-Process -FilePath "dist/$name" -ArgumentList '--verify-payload' -Wait -PassThru -WindowStyle Hidden
+          if ($check.ExitCode -ne 0) { throw "Payload check of the signed installer: exit code $($check.ExitCode)" }
+
+      # --- Hash and publish ---------------------------------------------------------------
+      - name: Write release.json and SHA256SUMS
+        id: hash
+        shell: pwsh
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          $name = "Phase-Setup-$env:VERSION.exe"
+          $file = Get-Item "dist/$name"
+          $hash = (Get-FileHash -Algorithm SHA256 $file.FullName).Hash.ToLowerInvariant()
+          # Signing changes the file, so size and hash are written here, after the last change.
+          # Edited as text: a JSON round trip in PowerShell would reformat the releasedAt date.
+          $json = Get-Content -Raw dist/release.json
+          $json = $json -replace '"sizeBytes":\s*\d+', ('"sizeBytes": ' + $file.Length)
+          $json = $json -replace '"sha256":\s*"[0-9a-f]*"', ('"sha256": "' + $hash + '"')
+          if (-not $json.Contains($hash)) { throw 'release.json: sha256 field not found' }
+          $utf8 = New-Object Text.UTF8Encoding($false)
+          [IO.File]::WriteAllText("$PWD/dist/release.json", $json, $utf8)
+          [IO.File]::WriteAllText("$PWD/dist/SHA256SUMS", "$hash  $name`n", $utf8)
+          "sha256=$hash" >> $env:GITHUB_OUTPUT
+          "name=$name" >> $env:GITHUB_OUTPUT
+          Write-Host "SHA-256: $hash"
+
+      - name: Create the GitHub Release
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ steps.version.outputs.version }}
+          SHA256: ${{ steps.hash.outputs.sha256 }}
+          FILE_NAME: ${{ steps.hash.outputs.name }}
+        run: |
+          $signed = if ($env:SIGNING -eq 'true') { 'Signed through SignPath Foundation.' } else { 'Not code-signed yet, so Windows SmartScreen may warn you. Check the hash first.' }
+          $lines = @(
+            "Phase LAN $env:VERSION for Windows 10 and 11 (64-bit).",
+            '',
+            "Installer: ``$env:FILE_NAME``",
+            '',
+            "SHA-256: ``$env:SHA256``",
+            '',
+            'Verify it in PowerShell before running:',
+            '',
+            '```powershell',
+            'Get-FileHash .\Phase-Setup-*.exe -Algorithm SHA256',
+            '```',
+            '',
+            $signed,
+            "Built by GitHub Actions from tag $env:GITHUB_REF_NAME ($env:GITHUB_SHA)."
+          )
+          $lines -join "`n" | Set-Content -Encoding utf8 notes.md
+          gh release create $env:GITHUB_REF_NAME "dist/$env:FILE_NAME" dist/release.json dist/SHA256SUMS `
+            --title "Phase LAN $env:VERSION" --notes-file notes.md --verify-tag

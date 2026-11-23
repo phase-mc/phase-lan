@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 26 26">
+  <style>.m-left{fill:#E0F2FE}.m-right{fill:#38BDF8}@media (prefers-color-scheme:light){.m-left{fill:#1E3A8A}.m-right{fill:#0284C7}}</style>
+  <path class="m-left" d="M12 2.5A9 9 0 0 0 12 20.5Z"/>
+  <path class="m-right" d="M14 5.5A9 9 0 0 1 14 23.5Z"/>
+</svg>

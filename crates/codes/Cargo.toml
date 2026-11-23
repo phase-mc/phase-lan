@@ -1,0 +1,37 @@
+[package]
+name = "phase-codes"
+description = "Phase: short room codes (K7F-2QX): format, code service protocol and client"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[features]
+# Code service client (the app window, automated tests). The server (phase-relay) only takes
+# the code format and request types.
+client = ["dep:reqwest", "dep:rustls"]
+# Codes without a server of our own: a "code → room" record in the pkarr network (pkarr.rs).
+pkarr = ["client", "dep:iroh-base", "dep:iroh-dns", "dep:iroh-tickets", "dep:blake3", "dep:getrandom"]
+
+[dependencies]
+phase-lang = { path = "../lang" }
+serde = { version = "1.0.229", features = ["derive"] }
+serde_json = "1.0.154"
+# Same versions and features as inside iroh: no new crates enter the build.
+reqwest = { version = "0.13", default-features = false, features = [
+    "rustls-no-provider",
+], optional = true }
+rustls = { version = "0.23.46", default-features = false, features = [
+    "ring",
+    "std",
+], optional = true }
+# Everything below is already in the build via iroh.
+iroh-base = { workspace = true, optional = true }
+iroh-dns = { workspace = true, optional = true }
+iroh-tickets = { workspace = true, optional = true }
+blake3 = { version = "1.8", optional = true }
+getrandom = { version = "0.3", optional = true }
+
+[dev-dependencies]
+tokio = { version = "1.54.1", features = ["full"] }
+getrandom = "0.3"

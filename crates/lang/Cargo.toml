@@ -1,0 +1,17 @@
+[package]
+name = "phase-lang"
+description = "Phase: interface language (ru/en), one per process, chosen in order: setting, installer, Windows language"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[dependencies]
+
+[target.'cfg(windows)'.dependencies]
+# Registry (the installer's choice) and the Windows interface language.
+windows-sys = { version = "0.61", features = [
+    "Win32_Foundation",
+    "Win32_Globalization",
+    "Win32_System_Registry",
+] }

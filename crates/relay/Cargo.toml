@@ -1,0 +1,45 @@
+[package]
+name = "phase-relay"
+description = "Phase: our own relay server (based on iroh-relay)"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[lib]
+path = "src/lib.rs"
+
+[[bin]]
+name = "phase-relay"
+path = "src/main.rs"
+
+[dependencies]
+anyhow = "1.0.104"
+clap = { version = "4.6.7", features = ["derive"] }
+# Room code service (codes.rs): HTTP/1 on the same hyper as inside iroh-relay;
+# random codes and secrets come from getrandom.
+getrandom = "0.3"
+http-body-util = "0.1.5"
+hyper = { version = "1.12", features = ["server", "http1"] }
+hyper-util = { version = "0.1.21", features = ["tokio"] }
+phase-codes = { path = "../codes" }
+serde = { version = "1.0.229", features = ["derive"] }
+serde_json = "1.0.154"
+iroh-base = { workspace = true }
+# Relay server from the iroh authors (same version as the client). Crypto is ring
+# (the tls-ring feature is on by default and in the server feature).
+iroh-relay = { workspace = true, features = ["server"] }
+# Self-signed certificate for a relay without a domain (same version as inside iroh-relay).
+rcgen = "0.14"
+rustls = { version = "0.23.46", default-features = false, features = ["ring", "std"] }
+rustls-pki-types = "1.15"
+# Constant-time password comparison (already used inside iroh).
+subtle = "2.6"
+tokio = { version = "1.54.1", features = ["full"] }
+tracing = "0.1.44"
+tracing-subscriber = { version = "0.3.23", features = ["env-filter"] }
+
+[dev-dependencies]
+# "Guest joins by code" test (tests/codes.rs): code client and the Phase tunnel.
+phase-codes = { path = "../codes", features = ["client"] }
+phase-tunnel = { path = "../tunnel" }

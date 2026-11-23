@@ -1,0 +1,23 @@
+[package]
+name = "phase-minecraft"
+description = "Phase: everything about Minecraft itself (LAN announcements, server status, voice mods)"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[dependencies]
+phase-lang = { path = "../lang" }
+anyhow = "1.0.104"
+# Hash of mod contents: the guest uses it to compare their mods folder with the host's.
+blake3 = "1.8.7"
+# Unpacking `level.dat` (gzip): we only read the world name from it.
+flate2 = "1.1.11"
+phase-netstat = { path = "../netstat" }
+serde = { version = "1.0.229", features = ["derive"] }
+serde_json = "1.0.154"
+# SHA-1 of mods: used to look a mod up on Modrinth.
+sha1 = "0.11.0"
+socket2 = "0.6"
+tokio = { version = "1.54.1", features = ["full"] }
+tracing = "0.1.44"

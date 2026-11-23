@@ -1,0 +1,58 @@
+[package]
+name = "phase-gui"
+description = "Phase: the app window (Tauri 2 + Svelte)"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[[bin]]
+name = "phase-gui"
+path = "src/main.rs"
+
+[build-dependencies]
+tauri-build = { version = "2.7.4", features = [] }
+
+[dependencies]
+phase-lang = { path = "../../lang" }
+anyhow = "1.0.104"
+# Window data folder: the same function Tauri uses to pick it (carries over LanBridge settings).
+dirs = "7.0.0"
+phase-core = { path = "../../core" }
+# Short room codes: registration on the host, lookup on the guest.
+phase-codes = { path = "../../codes", features = ["pkarr"] }
+phase-minecraft = { path = "../../minecraft" }
+# Whether a javaw.exe process exists ("0 fps while the game is running" mode).
+phase-netstat = { path = "../../netstat" }
+phase-tunnel = { path = "../../tunnel" }
+n0-future = "0.3"
+# Native "Select folder" dialog (the mods folder).
+rfd = "0.18.0"
+serde = { version = "1.0.229", features = ["derive"] }
+serde_json = "1.0.154"
+# Tauri 2 (stable branch). The @tauri-apps/* npm packages use the same 2.12 version.
+tauri = { version = "2.12.5", features = ["tray-icon", "image-ico"] }
+# "Launch with Windows" (the Run key in the current user's registry).
+tauri-plugin-autostart = "=2.7.0"
+# System notifications: "Phase is running in the tray", "The world is open to friends".
+tauri-plugin-notification = "=2.8.1"
+# phase:// links (scheme in tauri.conf.json → plugins.deep-link).
+tauri-plugin-deep-link = "=2.6.3"
+# One window per user: a link that launches a second instance is handed to the first.
+tauri-plugin-single-instance = { version = "=2.5.5", features = ["deep-link"] }
+tokio = { version = "1.54.1", features = ["full"] }
+tracing = "0.1.44"
+tracing-subscriber = { version = "0.3.23", features = ["env-filter"] }
+url = "2.5.8"
+
+# WebView2's own settings (harden.rs): no browser menu or shortcuts. Same versions
+# as inside Tauri, so no new crates appear in the build.
+[target.'cfg(windows)'.dependencies]
+webview2-com = "=0.39.1"
+windows-core = "=0.62.2"
+# Taskbar theme for the tray icon (tray.rs); same version as phase-tunnel.
+windows-sys = { version = "0.61", features = ["Win32_Foundation", "Win32_Security", "Win32_System_Registry", "Win32_System_Threading"] }
+
+[lints.rust]
+# A private build adds a `client` feature; its code is not part of this repository.
+unexpected_cfgs = { level = "warn", check-cfg = ['cfg(feature, values("client"))'] }

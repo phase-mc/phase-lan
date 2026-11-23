@@ -1,0 +1,4 @@
+node_modules/
+dist/
+# Schemas that Tauri generates at build time.
+src-tauri/gen/

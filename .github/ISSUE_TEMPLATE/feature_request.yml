@@ -1,0 +1,22 @@
+name: Feature request
+description: Suggest an idea for Phase LAN
+labels: ["enhancement"]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: What problem would it solve
+      description: Describe the situation, for example "my friends and I play a modpack and ...".
+    validations:
+      required: true
+  - type: textarea
+    id: idea
+    attributes:
+      label: What you would like
+      description: How it could work in Phase. Sketches and examples from other apps are welcome.
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: What you do today instead

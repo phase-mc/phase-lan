@@ -1,0 +1,7 @@
+/target
+*.metrics.json
+/dist
+/crates/setup/gen
+
+# Editor settings
+.vscode/

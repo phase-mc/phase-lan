@@ -1,0 +1,64 @@
+[workspace]
+resolver = "3"
+members = [
+    "crates/lang",
+    "crates/netstat",
+    "crates/tunnel",
+    "crates/minecraft",
+    "crates/relay",
+    "crates/codes",
+    "crates/core",
+    "crates/cli",
+    # The app window (Tauri 2 + Svelte). Built through npm, see the README.
+    "crates/gui/src-tauri",
+    # The installer (Tauri 2, no Node.js needed). Build: tools/build-setup.ps1.
+    "crates/setup",
+]
+# Plain `cargo build` / `cargo test` cover everything but the window (it needs Node.js).
+# Window: `--workspace` or `-p phase-gui`.
+default-members = [
+    "crates/lang",
+    "crates/netstat",
+    "crates/tunnel",
+    "crates/minecraft",
+    "crates/relay",
+    "crates/codes",
+    "crates/core",
+    "crates/cli",
+]
+
+[workspace.package]
+version = "1.0.1"
+edition = "2024"
+license = "MIT OR Apache-2.0"
+publish = false
+
+[workspace.dependencies]
+# Versions are pinned exactly (=) and only bumped by hand after reading the changes.
+iroh = "=1.4.1"
+iroh-base = "=1.4.1"
+iroh-dns = "=1.4.1"
+iroh-relay = "=1.4.1"
+iroh-tickets = "=1.0.0"
+
+# Debug builds keep line tables only. Every test links into its own binary, and with full
+# debug info the target folder grew to tens of gigabytes.
+[profile.dev]
+debug = "line-tables-only"
+
+[profile.release]
+# Speed over size (opt-level 3); panic = unwind so one failed connection does not take the process down.
+opt-level = 3
+panic = "unwind"
+
+# The installer: size matters, not speed. This profile does not affect the Phase build itself.
+[profile.setup]
+inherits = "release"
+opt-level = "s"
+lto = true
+codegen-units = 1
+strip = true
+
+# The installer build script compresses Phase.exe, which is too slow without optimisation.
+[profile.setup.build-override]
+opt-level = 3
