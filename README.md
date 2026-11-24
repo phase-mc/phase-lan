@@ -59,7 +59,7 @@ Under the hood every guest gets a local stand-in server on `127.0.0.1`. Whatever
     <td width="50%">
       <picture>
         <source media="(prefers-color-scheme: light)" srcset=".github/assets/screenshots/look-light.webp">
-        <img alt="Room styling: title, player colours and tags, highlighting and slots" src=".github/assets/screenshots/look-dark.webp">
+        <img alt="The room styling tab: welcome bar, title, player colours, tags and highlighting" src=".github/assets/screenshots/look-dark.webp">
       </picture>
       <p align="center"><b>Room look.</b> Title, colours, tags, glow and slots.</p>
     </td>
@@ -68,9 +68,9 @@ Under the hood every guest gets a local stand-in server on `127.0.0.1`. Whatever
     <td colspan="2">
       <picture>
         <source media="(prefers-color-scheme: light)" srcset=".github/assets/screenshots/mods-light.webp">
-        <img alt="The mods tab: ready-made packs, the mods folder and sharing with guests" src=".github/assets/screenshots/mods-dark.webp">
+        <img alt="The mods tab: the mods folder, its files and sharing with guests" src=".github/assets/screenshots/mods-dark.webp">
       </picture>
-      <p align="center"><b>Mods.</b> Ready-made packs, your mods folder and sharing with guests.</p>
+      <p align="center"><b>Mods.</b> Pick the mods folder, compare it with guests and share your mods with them.</p>
     </td>
   </tr>
 </table>
@@ -83,7 +83,6 @@ The nickname, world and mods in the screenshots are test data.
 - **You decide who gets in.** A code is not access. Every new device waits for the host's answer, and the host sees the player's nickname and device ID. Approved devices are remembered per profile.
 - **Direct first, relay if needed.** Phase tries a direct connection and falls back to a relay server through strict NAT or mobile internet. Traffic is end-to-end encrypted either way. The link comes back by itself after a short outage, and you can set your own relay in the settings.
 - **Mod sync.** A guest's `mods` folder is compared with the host's by hash. Missing mods are downloaded from [Modrinth](https://modrinth.com) or, if a mod is not there, directly from the host. The guest's previous mods move to `mods\.phase-backup` and come back with one button. Fabric guests need no mods at all to join.
-- **Ready-made packs.** Four packs for Fabric 1.21.1 (PvP, Manhunt, Speedrun, Survival) installed from Modrinth and checked by SHA-512. Your own files are never replaced.
 - **Room look.** Coloured nicknames, tags and roles, your own room title in the `Tab` header, player glow. Applied through a hidden datapack in the host's world while the room is open.
 - **Up to 50 slots.** The game allows 8 players in an open LAN world. With the free [Phase Companion](https://github.com/phase-mc/phase-companion) mod (Fabric 26.3 and 1.21.1, Forge 1.21.1, NeoForge 1.21.1), installed from the Phase window, the host can set from 2 to 50 slots.
 - **Voice chat.** Simple Voice Chat and Plasmo Voice work through the same channel. Phase finds their ports on the host's PC by itself.
