@@ -16,9 +16,9 @@ concurrency:
 env:
   CARGO_TERM_COLOR: always
   CARGO_INCREMENTAL: "0"
-  # Code signing through SignPath Foundation (https://signpath.org) is off until the project is
-  # accepted. To turn it on, the owner sets up the following in the repository settings:
-  #   1. Apply to SignPath Foundation, install the SignPath GitHub App for this repository and
+  # Code signing through SignPath Foundation (https://signpath.org) is off until a
+  # certificate is available. To turn it on, the owner sets up the following in the repository settings:
+  #   1. Get a signing certificate (SignPath or another provider), install the SignPath GitHub App for this repository and
   #      create a project with a "release-signing" signing policy and an artifact configuration
   #      that signs a single PE file inside the uploaded artifact (zip).
   #   2. Secret   SIGNPATH_API_TOKEN       - API token of a SignPath CI user that may submit

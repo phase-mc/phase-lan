@@ -106,7 +106,7 @@ Get-FileHash .\Phase-Setup-*.exe -Algorithm SHA256
 
 If the hash does not match, do not run the file.
 
-**Why Windows may warn you.** The installer is not code-signed yet, so SmartScreen may show "Windows protected your PC" for a new file without reputation. The warning alone does not mean the file is harmful. Check the hash, then use *More info* → *Run anyway*. Signing through the [SignPath Foundation](https://signpath.org) program is being set up, see the [code signing policy](#code-signing-policy).
+**Why Windows may warn you.** The installer is not code-signed yet, so SmartScreen may show "Windows protected your PC" for a new file without reputation. The warning alone does not mean the file is harmful. Check the hash, then use *More info* → *Run anyway*. See the [code signing policy](#code-signing-policy) for what we do instead and what we plan.
 
 **What the installer does.** It installs Phase into your user folder (`%LOCALAPPDATA%\Programs\Phase`) with a shortcut and an uninstaller. No administrator rights, no bundled programs. The only download it may make is WebView2 from Microsoft, with your consent and after checking its signature.
 
@@ -135,9 +135,9 @@ Found a vulnerability? Please report it privately, see [SECURITY.md](SECURITY.md
 
 ## Code signing policy
 
-**Status.** Phase LAN has applied for free code signing from the [SignPath Foundation](https://signpath.org), with a certificate provided by [SignPath.io](https://about.signpath.io). The application is in progress: current releases, 1.0.2 included, are not signed yet. Until signing is in place, check the SHA-256 of every download as described above.
+**Status.** Current releases, 1.0.2 included, are not digitally signed. Until they are, verify every download yourself: check its SHA-256 as described above, look at the VirusTotal report linked from the release page and read the public build log on GitHub Actions. We plan to add a digital signature later, once the project has enough public history and users. The rules below are the policy we have adopted; they take effect as soon as a signing certificate is obtained.
 
-**What is signed.** Only files built from this open repository, [phase-mc/phase-lan](https://github.com/phase-mc/phase-lan): the installer `Phase-Setup-<version>.exe` and the `Phase.exe` it installs. They are built exclusively by the public [release workflow](.github/workflows/release.yml) on GitHub Actions from a version tag, and its log is open to everyone. Nothing built on a personal computer is ever submitted for signing.
+**What is signed.** Only files built from this open repository, [phase-mc/phase-lan](https://github.com/phase-mc/phase-lan): the installer `Phase-Setup-<version>.exe` and the `Phase.exe` it installs. They are built exclusively by the public [release workflow](.github/workflows/release.yml) on GitHub Actions from a version tag, and its log is open to everyone. Nothing built on a personal computer is ever submitted for signing. This describes the future process: nothing is signed today.
 
 **Roles.**
 
