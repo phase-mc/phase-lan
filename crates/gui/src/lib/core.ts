@@ -124,6 +124,8 @@ export interface HostReady {
   relay: RelayInfo;
   allowed_devices: number;
   asks_new_devices: boolean;
+  /** New devices waiting in line behind the one in the "Let in?" question (asked in arrival order). */
+  queued: number;
   /** Who is in the room now, in connection order. */
   guests: GuestPeer[];
   mods: HostModsStatus;
@@ -312,6 +314,8 @@ export interface LookStatus {
   title: string;
   settings: LookSettings;
   players: LookPlayer[];
+  /** Phase Companion answers in the room's world (without it: the game's account check and 8 seats). */
+  companion: boolean;
   error: string | null;
 }
 
@@ -404,6 +408,7 @@ export type TunnelEvent =
       nickname: string | null;
       decision: AccessDecision;
     }
+  | { kind: "queue"; waiting: number }
   | { kind: "game_unreachable"; port: number; error: string }
   | { kind: "host_lost"; reason: string }
   | { kind: "reconnect_failed"; error: string; retry_in_ms: number }
@@ -638,7 +643,10 @@ export const LINK_CHANNEL = "phase://link";
 
 /** Invitation link (Rust: crates/gui/src-tauri/src/links.rs). */
 export type PhaseLink =
-  { kind: "join"; code: string } | { kind: "ticket"; ticket: string };
+  | { kind: "join"; code: string }
+  | { kind: "ticket"; ticket: string }
+  /** Our scheme, but damaged or not supported by this version: the window says so. */
+  | { kind: "broken" };
 
 export function onLink(handler: () => void): Promise<UnlistenFn> {
   return listen(LINK_CHANNEL, () => handler());

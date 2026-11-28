@@ -98,10 +98,12 @@ function describeTunnel(e: TunnelEvent, role: Role | null, who: Who): JournalDra
         }),
       };
     // Ping is shown on screen, failed reconnection attempts — in the status;
-    // mods handed to guests are counted on the "Mods" tab (a line per file is noise).
+    // mods handed to guests are counted on the "Mods" tab (a line per file is noise);
+    // the line of players waiting is shown in the question window.
     case "ping":
     case "reconnect_failed":
     case "mod_sent":
+    case "queue":
       return null;
   }
 }

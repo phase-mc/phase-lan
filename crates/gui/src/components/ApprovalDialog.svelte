@@ -4,6 +4,8 @@
   // in tiles for checking: the player names themselves, but access is granted by ID.
   // Keyboard: focus starts on "Decline" (the safe answer), Tab moves to "Let in",
   // Enter answers with the focused button, Esc — "Decline".
+  // New players wait in line (the core asks about them one at a time, in arrival order): the caption
+  // says how many are behind this one, and after an answer the window stays open for the next.
   import ShieldCheck from "@lucide/svelte/icons/shield-check";
   import { app } from "../lib/app.svelte";
   import { t } from "../lib/i18n/index.svelte";
@@ -12,10 +14,22 @@
   import Modal from "./Modal.svelte";
 
   const ANSWER_SECONDS = 60;
+  /** How long the window waits for the next player in line after an answer. */
+  const NEXT_WAIT_MS = 2000;
 
   const current = $derived(app.approvals[0]);
-  const queued = $derived(app.approvals.length);
+  /** Players behind this one: other open questions and the core's line. */
+  const behind = $derived(Math.max(0, app.approvals.length - 1) + app.queued);
   let now = $state(Date.now());
+
+  /** Between an answer and the next player's question: the window does not close and reopen. */
+  let next = $state(false);
+  let nextTimer: ReturnType<typeof setTimeout> | undefined;
+  $effect(() => {
+    if (!current) return;
+    next = false;
+    clearTimeout(nextTimer);
+  });
 
   $effect(() => {
     if (!current) return;
@@ -29,21 +43,29 @@
   const clock = $derived(`${Math.floor(left / 60)}:${String(left % 60).padStart(2, "0")}`);
 
   function answer(allow: boolean) {
-    if (current) void app.answer(current.request_id, allow);
+    if (!current) return;
+    if (behind > 0) {
+      next = true;
+      clearTimeout(nextTimer);
+      nextTimer = setTimeout(() => (next = false), NEXT_WAIT_MS);
+    }
+    void app.answer(current.request_id, allow);
   }
 </script>
 
 <Modal
-  open={current !== undefined}
-  label={queued > 1 ? t("approval.labelQueued", { n: queued }) : t("approval.label")}
+  open={current !== undefined || next}
+  label={behind > 0 ? t("approval.labelQueued", { n: behind }) : t("approval.label")}
   title={t("approval.title")}
-  onclose={() => answer(false)}
+  onclose={() => (current ? answer(false) : (next = false))}
   width={520}
 >
   {#snippet aside()}
-    <p class="badge badge-mono {left <= 10 ? 'badge-red' : 'badge-blue'}" aria-live="off">
-      <span class="sr-only">{t("approval.secondsLeft")} </span>{clock}
-    </p>
+    {#if current}
+      <p class="badge badge-mono {left <= 10 ? 'badge-red' : 'badge-blue'}" aria-live="off">
+        <span class="sr-only">{t("approval.secondsLeft")} </span>{clock}
+      </p>
+    {/if}
   {/snippet}
   {#snippet band()}
     {#if current}
@@ -100,14 +122,16 @@
       <span><span class="kbd">Enter</span> {t("approval.keyAnswer")}</span>
       <span><span class="kbd">Esc</span> {t("approval.keyDecline")}</span>
     </p>
+  {:else}
+    <p class="py-6 text-[14px] text-fg-2" role="status" data-approval-next>{t("approval.next")}</p>
   {/if}
 
   {#snippet actions()}
     <!-- "Decline" first: the default focus is on the safe answer. -->
-    <button type="button" class="btn btn-lg" onclick={() => answer(false)}>
+    <button type="button" class="btn btn-lg" onclick={() => answer(false)} disabled={!current}>
       {t("approval.decline")} <span class="kbd">Esc</span>
     </button>
-    <button type="button" class="btn btn-primary btn-lg" onclick={() => answer(true)}>
+    <button type="button" class="btn btn-primary btn-lg" onclick={() => answer(true)} disabled={!current}>
       {t("approval.allow")}
     </button>
   {/snippet}

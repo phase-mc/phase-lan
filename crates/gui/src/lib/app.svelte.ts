@@ -34,6 +34,7 @@ import {
   type Tone,
 } from "./journal";
 import { t } from "./i18n/index.svelte";
+import { codeFromInput } from "./invite";
 import { nav } from "./nav.svelte";
 
 export interface JournalEntry {
@@ -97,6 +98,8 @@ class AppStore {
   draftTicket = $state("");
   /** A phase:// link that arrived during a session: waits for the "Disconnect and go?" answer. */
   pendingLink = $state<PhaseLink | null>(null);
+  /** The room code the last invite link filled in: "Join" says where the code came from. */
+  linkCode = $state<string | null>(null);
 
   #roomCode = $state<RoomCode | null>(null);
   #nextEntry = 1;
@@ -122,6 +125,11 @@ class AppStore {
       path: this.links[g.device_id]?.path ?? null,
       rttMs: this.links[g.device_id]?.rttMs ?? null,
     }));
+  }
+
+  /** Players waiting in line behind the "Let in?" question on screen (host only). */
+  get queued(): number {
+    return this.role === "host" ? (this.status?.host?.queued ?? 0) : 0;
   }
 
   /** Short room code (host only, this session only). */
@@ -222,11 +230,30 @@ class AppStore {
    *  Connecting doesn't start by itself — anyone could have sent the link, and a connection
    *  reveals the IP. During a session we first ask "Disconnect and go?". */
   openLink(link: PhaseLink): void {
+    if (link.kind === "broken") {
+      // Nothing to fill in. A running session stays where it is; the bar explains the link.
+      if (!this.active && !this.starting) nav.go("join");
+      this.error = t("link.broken");
+      return;
+    }
+    // The room this window is already in: the host opened their own link to check it, or the
+    // guest clicked the same link again. Nothing to ask, just show that room.
+    const role = this.role ?? this.starting;
+    if (role && this.#isCurrentRoom(role, link)) {
+      nav.go(role === "host" ? "host" : "join");
+      return;
+    }
     if (this.active || this.starting) {
       this.pendingLink = link;
       return;
     }
     this.#fillLink(link);
+  }
+
+  #isCurrentRoom(role: Role, link: PhaseLink): boolean {
+    if (role === "host") return link.kind === "join" && link.code === this.roomCode?.code;
+    if (link.kind === "join") return link.code === codeFromInput(this.draftTicket);
+    return link.kind === "ticket" && link.ticket === this.draftTicket.trim();
   }
 
   /** "Go": stop the session and fill in the code from the link. */
@@ -243,7 +270,9 @@ class AppStore {
   }
 
   #fillLink(link: PhaseLink): void {
+    if (link.kind === "broken") return;
     this.draftTicket = link.kind === "join" ? link.code : link.ticket;
+    this.linkCode = link.kind === "join" ? codeFromInput(link.code) : null;
     this.error = null;
     nav.go("join");
   }

@@ -21,7 +21,8 @@ export const ui = {
 
   // ---- вопрос «Пустить?»
   "approval.label": "Запрос доступа",
-  "approval.labelQueued": "Запрос доступа · 1 из {n}",
+  "approval.labelQueued": "Запрос доступа · ещё {n} в очереди",
+  "approval.next": "Следующий игрок из очереди…",
   "approval.title": "Пустить игрока в комнату?",
   "approval.secondsLeft": "Осталось секунд:",
   "approval.wantsIn": "хочет войти в комнату",

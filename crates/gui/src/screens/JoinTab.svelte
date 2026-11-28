@@ -15,8 +15,9 @@
   import ModSyncCard from "../components/ModSyncCard.svelte";
   import { app } from "../lib/app.svelte";
   import { tick } from "svelte";
-  import { isRoomCode, NICKNAME_MAX, normalizeCode, shortId, type PathKind } from "../lib/core";
+  import { isRoomCode, NICKNAME_MAX, shortId, type PathKind } from "../lib/core";
   import { t, type Key } from "../lib/i18n/index.svelte";
+  import { codeFromInput } from "../lib/invite";
   import { look } from "../lib/look.svelte";
   import { nav } from "../lib/nav.svelte";
   import { cleanNickname, profiles } from "../lib/profiles.svelte";
@@ -37,9 +38,12 @@
   const lost = $derived(status?.phase === "reconnecting");
 
   const ticket = $derived(app.draftTicket.trim());
-  /** Room code `K7F-2QX` (in any form: lowercase, without a hyphen) — Phase finds the
-   *  invitation on the code service itself. A named code (`vanilla-crew`) doesn't work yet. */
-  const roomCode = $derived(normalizeCode(ticket));
+  /** Room code `K7F-2QX` (in any form: lowercase, without a hyphen, or inside an invite link
+   *  from the site) — Phase finds the invitation on the code service itself. A named code
+   *  (`vanilla-crew`) doesn't work yet. */
+  const roomCode = $derived(codeFromInput(ticket));
+  /** The code came with an invite link: the line under the field says so. */
+  const fromLink = $derived(roomCode !== null && roomCode === app.linkCode);
   const vanityCode = $derived(!roomCode && isRoomCode(ticket) ? ticket : null);
   const ticketError = $derived(
     ticket && !roomCode && !vanityCode && !ticket.startsWith("endpoint")
@@ -104,7 +108,8 @@
     if (!canJoin || app.starting) return;
     void app.join({
       profile: settings.profile,
-      ticket,
+      // A pasted invite link goes to the core as the bare code.
+      ticket: roomCode ?? ticket,
       net: settings.net(),
       mods: settings.guestMods(),
     });
@@ -177,8 +182,9 @@
               {#if ticketError}
                 <p id="ticket-error" class="error-text" role="alert">{ticketError}</p>
               {:else if roomCode}
-                <p id="ticket-code" class="mt-3 text-[13px] text-fg-2" role="status">
-                  {t("join.codeFound")} <span class="font-mono text-fg">{roomCode}</span> {t("join.codeFound2")}
+                <p id="ticket-code" class="mt-3 text-[13px] text-fg-2" role="status" data-code-line={fromLink ? "link" : "code"}>
+                  {t("join.codeFound")} <span class="font-mono text-fg">{roomCode}</span>
+                  {fromLink ? t("join.codeFromLink") : t("join.codeFound2")}
                 </p>
               {:else if vanityCode}
                 <p id="ticket-code" class="mt-3 text-[13px] text-fg-2" role="status">

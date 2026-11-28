@@ -16,7 +16,8 @@ export const ui: Translated<typeof ruUi> = {
   "count.guests": { one: "{n} guest", other: "{n} guests" },
 
   "approval.label": "Access request",
-  "approval.labelQueued": "Access request · 1 of {n}",
+  "approval.labelQueued": "Access request · {n} more waiting",
+  "approval.next": "Next player in line…",
   "approval.title": "Let this player into the room?",
   "approval.secondsLeft": "Seconds left:",
   "approval.wantsIn": "wants to join your room",

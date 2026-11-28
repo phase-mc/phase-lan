@@ -36,7 +36,8 @@ pub enum AccessDecision {
     AlreadyDenied,
     /// Questions are off: unknown devices are not let in.
     PromptsOff,
-    /// The host is still answering the question about another device.
+    /// The line of devices waiting for the host's answer is full
+    /// ([`crate::access::APPROVE_QUEUE`]).
     Busy,
     /// The host did not answer in time.
     Timeout,
@@ -94,6 +95,9 @@ pub enum TunnelEvent {
         nickname: Option<String>,
         decision: AccessDecision,
     },
+    /// Host: how many new devices wait in line behind the one the host is being asked about
+    /// (sent when the number changes).
+    Queue { waiting: u32 },
     /// Host: the game on this PC does not accept the connection (world closed, wrong port).
     GameUnreachable { port: u16, error: String },
     /// Guest: the connection to the host was lost, reconnecting.

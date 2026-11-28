@@ -401,6 +401,9 @@ pub struct LookStatus {
     pub settings: LookSettings,
     /// The host and guests (in order of connection).
     pub players: Vec<LookPlayer>,
+    /// Phase Companion answers in the room's world. Without it the world keeps the game's own
+    /// account check and 8 seats, whatever the settings say.
+    pub companion: bool,
     /// Why the datapack is not written.
     pub error: Option<String>,
 }
@@ -1060,6 +1063,7 @@ impl Look {
                 .unwrap_or_else(|| datapack::DEFAULT_TITLE.to_string()),
             settings: inner.settings.clone(),
             players,
+            companion: inner.companion,
             error: inner.error.clone(),
         }
     }

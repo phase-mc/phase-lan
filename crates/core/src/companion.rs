@@ -94,7 +94,8 @@ pub fn loader_from_command_line(command_line: &str) -> Option<Loader> {
     if lower.contains("--fml.forgeversion") || lower.contains("net.minecraftforge.") {
         return Some(Loader::Forge);
     }
-    if lower.contains("net.fabricmc.") {
+    // Quilt Loader runs Fabric mods, so a Quilt host gets the Fabric build.
+    if lower.contains("net.fabricmc.") || lower.contains("org.quiltmc.") {
         return Some(Loader::Fabric);
     }
     let version = mc_mods::flag_value(command_line, "--version")?.to_ascii_lowercase();
@@ -102,7 +103,7 @@ pub fn loader_from_command_line(command_line: &str) -> Option<Loader> {
         Some(Loader::Neoforge)
     } else if version.contains("forge") {
         Some(Loader::Forge)
-    } else if version.contains("fabric") {
+    } else if version.contains("fabric") || version.contains("quilt") {
         Some(Loader::Fabric)
     } else {
         None
@@ -479,6 +480,35 @@ mod tests {
     }
 
     #[test]
+    fn manifest_jar_serves_its_version_range() {
+        // Since 0.4.0 one jar covers a range (`minecraft_versions` of its adapter).
+        let mut fabric = entry("https://x/f.jar", b"f");
+        fabric["mc"] = serde_json::json!(["26.1", "26.1.1", "26.1.2", "26.2", "26.3"]);
+        let mut neo = entry("https://x/n.jar", b"n");
+        neo["loader"] = "neoforge".into();
+        neo["mc"] = serde_json::json!(["1.21", "1.21.1"]);
+        neo["file"] = "phase-companion-neoforge-1.21.1-0.4.0.jar".into();
+        let manifest = Manifest::parse(
+            serde_json::json!({ "schema": 1, "mods": [fabric, neo] })
+                .to_string()
+                .as_bytes(),
+        )
+        .unwrap();
+        for mc in ["26.1", "26.1.2", "26.2", "26.3"] {
+            assert!(manifest.pick(Loader::Fabric, mc).is_some(), "fabric {mc}");
+        }
+        assert!(manifest.pick(Loader::Fabric, "26.4").is_none());
+        for mc in ["1.21", "1.21.1"] {
+            assert_eq!(
+                manifest.pick(Loader::Neoforge, mc).map(|e| e.file.as_str()),
+                Some("phase-companion-neoforge-1.21.1-0.4.0.jar"),
+                "neoforge {mc}"
+            );
+        }
+        assert!(manifest.pick(Loader::Neoforge, "1.21.2").is_none());
+    }
+
+    #[test]
     fn manifest_picks_by_loader_and_version() {
         let manifest = Manifest::parse(
             serde_json::json!({ "schema": 1, "mods": [entry("https://x/y.jar", b"a")] })
@@ -565,6 +595,13 @@ mod tests {
         assert_eq!(loader_from_command_line(neo), Some(Loader::Neoforge));
         let fabric = r"javaw.exe -cp C:\g\libraries\net\fabricmc\fabric-loader\0.17.3\fabric-loader.jar net.fabricmc.loader.impl.launch.knot.KnotClient --gameDir C:\g --version fabric-loader-0.17.3-1.21.1";
         assert_eq!(loader_from_command_line(fabric), Some(Loader::Fabric));
+        // Quilt runs Fabric mods: the host gets the Fabric build.
+        let quilt = r"javaw.exe -cp C:\g\libraries\org\quiltmc\quilt-loader\0.29.2\quilt-loader-0.29.2.jar org.quiltmc.loader.impl.launch.knot.KnotClient --gameDir C:\g --version quilt-loader-0.29.2-1.21.1";
+        assert_eq!(loader_from_command_line(quilt), Some(Loader::Fabric));
+        assert_eq!(
+            loader_from_command_line(r"javaw.exe x --gameDir C:\g --version Quilt-1.21.1"),
+            Some(Loader::Fabric)
+        );
         // Only the version name in the launcher.
         assert_eq!(
             loader_from_command_line(

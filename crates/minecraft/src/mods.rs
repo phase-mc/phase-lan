@@ -387,7 +387,8 @@ fn same_dir(a: &Path, b: &Path) -> bool {
 /// Loader metadata files inside a mod jar.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub struct JarMetadata {
-    /// `fabric.mod.json`: a Fabric (and Quilt) mod.
+    /// `fabric.mod.json` or `quilt.mod.json`: a Fabric or Quilt mod. Quilt Loader runs Fabric
+    /// mods, so for Phase both are one family: the Fabric build of a mod goes to both.
     pub fabric: bool,
     /// `META-INF/mods.toml`: a Forge (and NeoForge before 1.20.5) mod.
     pub forge: bool,
@@ -442,7 +443,7 @@ fn directory_metadata(directory: &[u8]) -> JarMetadata {
             break;
         };
         match name {
-            b"fabric.mod.json" => meta.fabric = true,
+            b"fabric.mod.json" | b"quilt.mod.json" => meta.fabric = true,
             b"META-INF/mods.toml" => meta.forge = true,
             b"META-INF/neoforge.mods.toml" => meta.neoforge = true,
             _ => {}
@@ -1052,6 +1053,15 @@ mod tests {
         );
         assert_eq!(
             fabric,
+            JarMetadata {
+                fabric: true,
+                ..JarMetadata::default()
+            }
+        );
+        // A Quilt-only mod counts as the Fabric family: Quilt Loader runs Fabric mods.
+        let quilt = write("q.jar", &["quilt.mod.json", "q/Q.class"]);
+        assert_eq!(
+            quilt,
             JarMetadata {
                 fabric: true,
                 ..JarMetadata::default()

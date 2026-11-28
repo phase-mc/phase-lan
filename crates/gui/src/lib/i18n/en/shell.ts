@@ -37,6 +37,8 @@ export const shell: Translated<typeof ruShell> = {
   "link.fillInvite": "The invite will be filled in on the Join tab, and you connect yourself.",
   "link.stay": "Stay",
   "link.go": "Open it",
+  "link.broken":
+    "This invite link did not open: it is incomplete or damaged. Ask your friend for a new link or the room code.",
 
   "account.toggle": "Let players in without an account check",
   "account.hint":

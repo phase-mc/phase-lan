@@ -21,8 +21,8 @@ use phase_setup::{
     existing::{self, InstallKind, InstallMode},
     install::{self, InstallRequest, Product},
     integration::{
-        CLASSES_COMMAND_KEY, LANGUAGE_VALUE, PRODUCT_KEY, RUN_KEY, UNINSTALL_KEY, VENDOR_KEY,
-        autostart_command, deep_link_command,
+        CLASSES_COMMAND_KEY, CLASSES_ICON_KEY, CLASSES_KEY, LANGUAGE_VALUE, PRODUCT_KEY, RUN_KEY,
+        UNINSTALL_KEY, VENDOR_KEY, autostart_command, deep_link_command,
     },
     manifest::Manifest,
     payload::{Payload, to_hex},
@@ -312,6 +312,60 @@ fn uninstall_keeps_user_data_by_default() {
     assert!(lab.reg.get_str(CLASSES_COMMAND_KEY, "").is_none());
     // Without consent to delete data, the language choice stays.
     assert_eq!(lab.reg.get_str(VENDOR_KEY, LANGUAGE_VALUE).unwrap(), "en");
+}
+
+/// Invite links from the site open `phase://join/<code>`: Windows hands them to Phase only through
+/// the user's own `Software\Classes\phase` key (no administrator rights), and uninstalling removes
+/// it without leaving empty keys behind.
+#[test]
+fn invite_links_are_registered_per_user_and_removed_cleanly() {
+    let lab = Lab::new("protocol");
+    let dir = lab.install(&lab.request()).unwrap();
+    let exe = dir.join(APP_EXE);
+    assert_eq!(
+        lab.reg.get_str(CLASSES_KEY, "URL Protocol").as_deref(),
+        Some(""),
+        "без этого значения Windows не считает ключ протоколом"
+    );
+    assert_eq!(
+        lab.reg.get_str(CLASSES_KEY, "").as_deref(),
+        Some("URL:app.phase.desktop protocol")
+    );
+    assert_eq!(
+        lab.reg.get_str(CLASSES_COMMAND_KEY, "").unwrap(),
+        format!("\"{}\" \"%1\"", exe.display())
+    );
+    assert_eq!(
+        lab.reg.get_str(CLASSES_ICON_KEY, "").unwrap(),
+        format!("{},0", exe.display())
+    );
+
+    lab.uninstall(&dir, false).unwrap();
+    for key in [CLASSES_COMMAND_KEY, CLASSES_ICON_KEY, CLASSES_KEY] {
+        assert!(!lab.reg.key_exists(key), "{key} остался после удаления");
+    }
+}
+
+/// Another copy (a portable one, say) took the links over after the install: uninstalling this
+/// copy leaves that registration alone, links keep opening the other copy.
+#[test]
+fn uninstall_leaves_links_of_another_copy() {
+    let lab = Lab::new("protocol-other");
+    let dir = lab.install(&lab.request()).unwrap();
+    let other = r#""D:\Games\Phase\Phase.exe" "%1""#;
+    lab.reg
+        .set(CLASSES_COMMAND_KEY, "", &RegVal::Str(other.into()))
+        .unwrap();
+
+    lab.uninstall(&dir, false).unwrap();
+    assert_eq!(
+        lab.reg.get_str(CLASSES_COMMAND_KEY, "").as_deref(),
+        Some(other)
+    );
+    assert_eq!(
+        lab.reg.get_str(CLASSES_KEY, "URL Protocol").as_deref(),
+        Some("")
+    );
 }
 
 #[test]

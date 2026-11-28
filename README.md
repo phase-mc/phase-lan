@@ -135,7 +135,7 @@ Found a vulnerability? Please report it privately, see [SECURITY.md](SECURITY.md
 
 ## Code signing policy
 
-**Status.** Current releases, 1.0.2 included, are not digitally signed. Until they are, verify every download yourself: check its SHA-256 as described above, look at the VirusTotal report linked from the release page and read the public build log on GitHub Actions. We plan to add a digital signature later, once the project has enough public history and users. The rules below are the policy we have adopted; they take effect as soon as a signing certificate is obtained.
+**Status.** Current releases, 1.0.3 included, are not digitally signed. Until they are, verify every download yourself: check its SHA-256 as described above, look at the VirusTotal report linked from the release page and read the public build log on GitHub Actions. We plan to add a digital signature later, once the project has enough public history and users. The rules below are the policy we have adopted; they take effect as soon as a signing certificate is obtained.
 
 **What is signed.** Only files built from this open repository, [phase-mc/phase-lan](https://github.com/phase-mc/phase-lan): the installer `Phase-Setup-<version>.exe` and the `Phase.exe` it installs. They are built exclusively by the public [release workflow](.github/workflows/release.yml) on GitHub Actions from a version tag, and its log is open to everyone. Nothing built on a personal computer is ever submitted for signing. This describes the future process: nothing is signed today.
 

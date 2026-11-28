@@ -82,7 +82,7 @@ export const lib = {
   "journal.access.denied": "Вы отклонили игрока {who}.",
   "journal.access.alreadyDenied": "Игрок {who} снова просит доступ. Он уже отклонён.",
   "journal.access.promptsOff": "Игрок {who} отклонён: новые устройства не принимаются.",
-  "journal.access.busy": "Игрок {who} отклонён: вы ещё отвечаете на другой запрос.",
+  "journal.access.busy": "Игрок {who} отклонён: в очереди к вам уже слишком много игроков.",
   "journal.access.timeout": "Вы не ответили вовремя. Игрок {who} отклонён.",
   "journal.access.guestLeft": "Игрок {who} ушёл, не дождавшись ответа.",
   "journal.access.roomFull": "Игрок {who} не вошёл: в комнате нет свободных мест.",

@@ -250,6 +250,9 @@ pub struct HostReady {
     pub allowed_devices: usize,
     /// Ask about new devices (`false` means let in only allowed ones).
     pub asks_new_devices: bool,
+    /// New devices waiting in line behind the one the host is being asked about: they are asked
+    /// one at a time, in arrival order.
+    pub queued: u32,
     /// Who is in the room now (in order of connection). Guests' path and ping go as events
     /// ([`phase_tunnel::events::TunnelEvent`]): they change too often.
     pub guests: Vec<GuestPeer>,

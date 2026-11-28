@@ -19,6 +19,7 @@
   import { app } from "../lib/app.svelte";
   import { core, formatSize, modsWord, type Phase, type RecentWorld } from "../lib/core";
   import { t, type Key } from "../lib/i18n/index.svelte";
+  import { inviteUrl } from "../lib/invite";
   import { mods } from "../lib/mods.svelte";
   import { nav } from "../lib/nav.svelte";
   import { profiles } from "../lib/profiles.svelte";
@@ -31,6 +32,8 @@
   const roomCode = $derived(app.roomCode);
   const useCode = $derived(roomCode?.state === "pending" || roomCode?.state === "ready");
   const shortCode = $derived(roomCode?.state === "ready" ? roomCode.code : null);
+  /** Invite link for chats: the site page opens Phase with this code (only the code, see invite.ts). */
+  const inviteLink = $derived(shortCode ? inviteUrl(shortCode) : null);
   const guestList = $derived(app.guests);
   const guests = $derived(guestList.length);
   const guestBusy = $derived(app.role === "guest" || app.starting === "guest");
@@ -128,6 +131,14 @@
   }
 
   // ---------------------------------------------------------------- world in the room and voice
+  /** Joining without an account check is on, the world is found, but Phase Companion is not in it.
+   *  A vanilla LAN world checks accounts, so official Minecraft on the host may block offline-mode
+   *  friends. Some launchers (TLauncher) patch the check out themselves, and the game's process does not
+   *  say so reliably: hence a calm note under the world line, not an alarm. */
+  const accountCheckIdle = $derived(
+    !!host?.look.world && !host.look.companion && !host.look.settings.account_check,
+  );
+
   const roomWorld = $derived.by((): { warn: boolean; title: string; text: string } => {
     const world = app.role === "host" ? app.world : null;
     if (host && world?.kind === "checked" && world.error) {
@@ -353,7 +364,13 @@
       {#if useCode}
         <h1 id="hero-title" class="sr-only">{t("host.roomOpenCode")}</h1>
         {#if shortCode}
-          <p class="room-code" data-room-code aria-label={t("host.roomCodeLabel", { code: shortCode.split("").join(" ") })}>{shortCode}</p>
+          <!-- The link sits right at the code: the code is for saying aloud, the link for a chat. -->
+          <div class="room-code-row">
+            <p class="room-code" data-room-code aria-label={t("host.roomCodeLabel", { code: shortCode.split("").join(" ") })}>{shortCode}</p>
+            {#if inviteLink}
+              <CopyButton text={inviteLink} label={t("host.copyLink")} title={inviteLink} glyph="link" class="code-link" icon={15} />
+            {/if}
+          </div>
         {:else}
           <p class="room-code" data-pending aria-live="polite">···-···</p>
         {/if}
@@ -471,6 +488,14 @@
         <span class="dot {roomWorld.warn ? 'dot-warn' : 'dot-live'}" aria-hidden="true"></span>
         <span class="room-row-hint">{roomWorld.text}</span>
       </span>
+      {#if accountCheckIdle}
+        <span class="room-row-note" data-account-idle>
+          <span class="room-row-hint">{t("host.accountCheckIdle")}</span>
+          <button type="button" class="link relative z-[2] shrink-0 text-[13px]" onclick={() => nav.go("look")} data-account-idle-link>
+            {t("host.accountCheckIdleLink")}
+          </button>
+        </span>
+      {/if}
     </div>
     <div role="listitem" class="contents">{@render modsCard()}</div>
     <div role="listitem" class="contents">{@render lookCard()}</div>

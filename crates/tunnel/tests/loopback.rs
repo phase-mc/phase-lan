@@ -295,10 +295,10 @@ impl Approver for SlowYes {
 }
 
 #[tokio::test]
-async fn only_one_new_device_waits_for_approval() {
+async fn a_second_new_device_waits_in_line_instead_of_being_turned_away() {
     let host_addr = spawn_host_with_approver(vec![], None, Some(Arc::new(SlowYes))).await;
 
-    // Device A waits for the host's decision.
+    // Device A waits for the host's decision (this host answers after 1.5 s).
     let first = tokio::spawn({
         let host = host_addr.clone();
         async move {
@@ -308,17 +308,17 @@ async fn only_one_new_device_waits_for_approval() {
     });
     tokio::time::sleep(Duration::from_millis(400)).await;
 
-    // Device B meanwhile gets a rejection right away instead of queuing.
+    // Device B meanwhile queues up instead of a "busy" rejection, and is asked only after the
+    // answer about A: its own question starts about 1.1 s later and takes 1.5 s more.
     let ep = guest_endpoint(SecretKey::generate()).await;
     let started = std::time::Instant::now();
-    let Err(err) = guest::connect_once(&ep, &host_addr, None).await else {
-        panic!("the second new device should be rejected");
-    };
-    let reason = err.downcast_ref::<NotAllowed>().map(|e| e.reason);
-    assert_eq!(reason, Some(Some(RejectReason::Busy)), "{err:#}");
+    guest::connect_once(&ep, &host_addr, None)
+        .await
+        .expect("the second device waits in line and gets in");
     assert!(
-        started.elapsed() < Duration::from_secs(1),
-        "the rejection should be immediate"
+        started.elapsed() >= Duration::from_millis(2200),
+        "the second question came before the first answer: {:?}",
+        started.elapsed()
     );
 
     first

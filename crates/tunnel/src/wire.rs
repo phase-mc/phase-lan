@@ -64,7 +64,7 @@ pub enum RejectReason {
     NotAllowed,
     /// The host said "no".
     Denied,
-    /// The host is answering the question about another device right now.
+    /// Too many devices already wait in line for the host's answer.
     Busy,
     /// The host did not answer the question in time.
     Timeout,
@@ -117,8 +117,8 @@ impl RejectReason {
             .into(),
             Self::Denied => tr!("хост ответил «нет»", "the host said no").into(),
             Self::Busy => tr!(
-                "хост сейчас отвечает на вопрос о другом устройстве. Попробуйте ещё раз через минуту",
-                "the host is answering a request from another device right now. Try again in a minute"
+                "у хоста уже длинная очередь из желающих войти. Попробуйте ещё раз через пару минут",
+                "the host already has a long line of players waiting to get in. Try again in a couple of minutes"
             )
             .into(),
             Self::Timeout => tr!(

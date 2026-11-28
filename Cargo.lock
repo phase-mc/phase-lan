@@ -4169,7 +4169,7 @@ dependencies = [
 
 [[package]]
 name = "phase-cli"
-version = "1.0.2"
+version = "1.0.3"
 dependencies = [
  "anyhow",
  "clap",
@@ -4186,7 +4186,7 @@ dependencies = [
 
 [[package]]
 name = "phase-codes"
-version = "1.0.2"
+version = "1.0.3"
 dependencies = [
  "blake3",
  "getrandom 0.3.4",
@@ -4203,7 +4203,7 @@ dependencies = [
 
 [[package]]
 name = "phase-core"
-version = "1.0.2"
+version = "1.0.3"
 dependencies = [
  "anyhow",
  "n0-future",
@@ -4223,7 +4223,7 @@ dependencies = [
 
 [[package]]
 name = "phase-gui"
-version = "1.0.2"
+version = "1.0.3"
 dependencies = [
  "anyhow",
  "dirs 7.0.0",
@@ -4254,14 +4254,14 @@ dependencies = [
 
 [[package]]
 name = "phase-lang"
-version = "1.0.2"
+version = "1.0.3"
 dependencies = [
  "windows-sys 0.61.2",
 ]
 
 [[package]]
 name = "phase-minecraft"
-version = "1.0.2"
+version = "1.0.3"
 dependencies = [
  "anyhow",
  "blake3",
@@ -4278,7 +4278,7 @@ dependencies = [
 
 [[package]]
 name = "phase-netstat"
-version = "1.0.2"
+version = "1.0.3"
 dependencies = [
  "phase-lang",
  "windows-sys 0.61.2",
@@ -4286,7 +4286,7 @@ dependencies = [
 
 [[package]]
 name = "phase-relay"
-version = "1.0.2"
+version = "1.0.3"
 dependencies = [
  "anyhow",
  "clap",
@@ -4311,7 +4311,7 @@ dependencies = [
 
 [[package]]
 name = "phase-setup"
-version = "1.0.2"
+version = "1.0.3"
 dependencies = [
  "brotli",
  "brotli-decompressor",
@@ -4328,7 +4328,7 @@ dependencies = [
 
 [[package]]
 name = "phase-tunnel"
-version = "1.0.2"
+version = "1.0.3"
 dependencies = [
  "anyhow",
  "blake3",

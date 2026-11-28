@@ -1154,6 +1154,24 @@
     margin-top: 5px;
   }
 
+  /* A third line with a quiet note and an action: no status dot, the same tone as the hint. */
+  .room-row-note {
+    display: flex;
+    min-width: 0;
+    grid-column: 2;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 2px 10px;
+    margin-top: 4px;
+    color: var(--text-2);
+    font-size: 12.5px;
+    line-height: 1.4;
+  }
+
+  .room-row-note > .link {
+    line-height: 1.4;
+  }
+
   .room-row-sub > .link,
   .room-row-sub > .font-mono {
     line-height: 1.4;
@@ -1693,6 +1711,57 @@
 
   .room-code[data-pending] {
     color: var(--text-3);
+  }
+
+  /* The code and its invite link on one line; the link drops under the code if the line is short. */
+  .room-code-row {
+    display: flex;
+    max-width: 100%;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 10px 18px;
+    margin-top: 14px;
+  }
+
+  .room-code-row .room-code {
+    margin-top: 0;
+  }
+
+  /* "Copy link" next to the code: a small quiet button, the blue stays with the main action. */
+  .code-link {
+    display: inline-flex;
+    height: 34px;
+    flex: none;
+    cursor: pointer;
+    align-items: center;
+    gap: 7px;
+    border: 1px solid var(--ghost-border);
+    border-radius: var(--r-inner);
+    background: transparent;
+    padding: 0 12px;
+    color: var(--text-2);
+    font-size: 13px;
+    font-weight: 600;
+    white-space: nowrap;
+    transition:
+      background-color 200ms var(--ease-ui),
+      border-color 200ms var(--ease-ui),
+      color 200ms var(--ease-ui),
+      transform 200ms var(--ease-ui);
+  }
+
+  .code-link:hover {
+    border-color: var(--ghost-border-hover);
+    background: var(--ghost-bg-hover);
+    color: var(--text-1);
+  }
+
+  .code-link:active {
+    transform: scale(0.98);
+  }
+
+  .code-link:focus-visible {
+    outline-offset: 3px;
   }
 
   /* The "who is in the room" row: a stack of avatars and a caption. */

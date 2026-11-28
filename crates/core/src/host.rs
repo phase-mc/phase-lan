@@ -228,6 +228,7 @@ pub(crate) async fn run(
         relay: relay_info(&relay, network),
         allowed_devices: access.len(),
         asks_new_devices,
+        queued: 0,
         guests: Vec::new(),
         mods,
         room: RoomStatus {
@@ -363,6 +364,7 @@ fn guest_roster(ctx: &Ctx, look: &Look) -> EventSink {
                 host.mods.sent_files += 1;
                 host.mods.sent_bytes += size;
             }),
+            TunnelEvent::Queue { waiting } => guests(&|host| host.queued = *waiting),
             _ => {}
         }
         bus.emit(event);

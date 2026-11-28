@@ -22,7 +22,7 @@ use tokio::{
 use tracing::{info, warn};
 
 use crate::{
-    access::APPROVE_TIMEOUT,
+    access::{APPROVE_QUEUE, APPROVE_TIMEOUT},
     events::TunnelEvent,
     forward,
     metrics::{self, Telemetry},
@@ -30,11 +30,16 @@ use crate::{
     wire::{self, Hello, HostInfo, RejectReason, StreamKind, code},
 };
 
-/// How long to wait for the host's answer when connecting (including the time the host decides
-/// whether to let us in).
-const HANDSHAKE_TIMEOUT: Duration = APPROVE_TIMEOUT.saturating_add(Duration::from_secs(30));
+/// How long to wait for the host's answer when connecting, including the time the host decides
+/// whether to let us in: a full line ahead of us, our own question and a margin. The host drops
+/// us from the line as soon as we give up, and a dead host closes the connection long before.
+const HANDSHAKE_TIMEOUT: Duration =
+    Duration::from_secs(APPROVE_TIMEOUT.as_secs() * (APPROVE_QUEUE as u64 + 1) + 30);
 /// If the game connects while the connection to the host is being restored, how long to wait.
 const WAIT_FOR_HOST: Duration = Duration::from_secs(5);
+/// A host that turns us away drops our stream a moment before its reason arrives: how long to
+/// wait for that reason before reporting a bare end of stream.
+const CLOSE_REASON_WAIT: Duration = Duration::from_secs(1);
 /// Maximum pause between reconnect attempts.
 const MAX_BACKOFF: Duration = Duration::from_secs(10);
 /// How many of the host's voice UDP ports the guest is willing to open locally.
@@ -239,7 +244,13 @@ pub async fn connect_with(
     };
     match control_handshake(&conn, intro).await {
         Ok(info) => Ok((conn, info)),
-        Err(err) => Err(explain_close(&conn).unwrap_or(err)),
+        Err(err) => {
+            // "The host said no" or "did not answer in time" comes as the connection's close reason,
+            // right after the host drops our stream: without the wait the guest would see only
+            // "unexpected end of file".
+            let _ = tokio::time::timeout(CLOSE_REASON_WAIT, conn.closed()).await;
+            Err(explain_close(&conn).unwrap_or(err))
+        }
     }
 }
 

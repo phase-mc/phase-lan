@@ -10,9 +10,16 @@
 //! player states the nickname in the first message ([`wire::Hello`]): it is a label for
 //! convenience, not proof. So the "let in?" question shows the nickname together with the ID,
 //! and the allow list keeps the nickname only as a note next to the ID.
+//!
+//! **One question at a time, the rest wait in line.** New devices queue up in arrival order
+//! ([`Line`]); the host is asked about the first one, and the next question comes right after the
+//! answer. The time to answer counts from the moment a question is shown. A device keeps one place
+//! however many connections it opens, a guest who leaves the line drops out of it at once, and the
+//! line holds at most [`APPROVE_QUEUE`] devices behind the question on screen: a stranger with a
+//! public invite cannot flood the host, and a friend never waits behind more than that.
 
 use std::{
-    collections::{BTreeMap, BTreeSet, HashMap},
+    collections::{BTreeMap, BTreeSet, HashMap, VecDeque},
     fmt, fs,
     path::PathBuf,
     sync::{Arc, Mutex, RwLock},
@@ -28,7 +35,7 @@ use iroh::{
 };
 use n0_future::boxed::BoxFuture;
 use phase_lang::tr;
-use tokio::sync::Semaphore;
+use tokio::sync::watch;
 use tracing::{info, warn};
 
 use crate::{
@@ -37,8 +44,12 @@ use crate::{
     wire::{self, Hello, RejectReason, StreamKind},
 };
 
-/// How long to wait for the host's answer to the "let in?" question.
+/// How long to wait for the host's answer to the "let in?" question, from the moment it is shown.
 pub const APPROVE_TIMEOUT: Duration = Duration::from_secs(60);
+
+/// How many new devices may wait in line behind the one the host is being asked about. One more
+/// gets a clear "the line is full" rejection instead of a place.
+pub const APPROVE_QUEUE: usize = 8;
 
 /// How long to wait for a new device's hello (it carries the nickname) before asking
 /// "let in?" without a nickname. The guest sends the hello right after connecting, so
@@ -399,18 +410,174 @@ impl AccessList {
     }
 }
 
+/// New devices waiting for the host's answer, in arrival order. The first one is being asked (or
+/// is about to be); the rest wait for their turn. Each waiting connection holds a [`Place`].
+#[derive(Debug)]
+struct Line {
+    state: Mutex<LineState>,
+    /// Bumped on every change: waiting connections check their turn again.
+    changed: watch::Sender<u64>,
+    /// How many devices may wait behind the first one.
+    limit: usize,
+    /// [`TunnelEvent::Queue`] whenever that number changes.
+    events: EventSink,
+}
+
+#[derive(Debug, Default)]
+struct LineState {
+    /// Devices in arrival order, each once.
+    order: VecDeque<EndpointId>,
+    /// The newest connection of each device in line. A device that dials again keeps its place,
+    /// and its older connection gives the place up.
+    newest: HashMap<EndpointId, u64>,
+    /// The connection the host is being asked about now: until its answer nobody else is asked,
+    /// not even a newer connection of the same device.
+    asking: Option<u64>,
+    next_ticket: u64,
+}
+
+impl LineState {
+    fn waiting(&self) -> usize {
+        self.order.len().saturating_sub(1)
+    }
+}
+
+/// Where a connection stands in the [`Line`].
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum Turn {
+    /// Its device is first and nobody is being asked: this connection asks the host.
+    Now,
+    /// So many devices are ahead (0: its device is first, but an older connection of it is still
+    /// waiting for the host's answer).
+    Ahead(usize),
+    /// The same device dialed again and the newer connection took the place over.
+    Replaced,
+}
+
+impl Line {
+    fn new(limit: usize, events: EventSink) -> Self {
+        Self {
+            state: Mutex::default(),
+            changed: watch::Sender::new(0),
+            limit,
+            events,
+        }
+    }
+
+    fn lock(&self) -> std::sync::MutexGuard<'_, LineState> {
+        self.state
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner())
+    }
+
+    /// A place for a connection of `id`; a device already in line keeps its place. `None`: the
+    /// line is full.
+    fn join(self: &Arc<Self>, id: EndpointId) -> Option<Place> {
+        let mut state = self.lock();
+        let before = state.waiting();
+        if !state.newest.contains_key(&id) {
+            if state.order.len() > self.limit {
+                return None;
+            }
+            state.order.push_back(id);
+        }
+        let ticket = state.next_ticket;
+        state.next_ticket += 1;
+        state.newest.insert(id, ticket);
+        let after = state.waiting();
+        drop(state);
+        self.changed(before, after);
+        Some(Place {
+            line: self.clone(),
+            id,
+            ticket,
+        })
+    }
+
+    /// Wakes the waiting connections and reports the new length of the line.
+    fn changed(&self, before: usize, after: usize) {
+        self.changed.send_modify(|n| *n = n.wrapping_add(1));
+        if before != after {
+            self.events.emit(TunnelEvent::Queue {
+                waiting: u32::try_from(after).unwrap_or(u32::MAX),
+            });
+        }
+    }
+}
+
+/// A connection's place in the [`Line`]. Dropping it (an answer, a rejection, the guest left)
+/// gives the place up, if it is still this connection's, and wakes the next device in line.
+#[derive(Debug)]
+struct Place {
+    line: Arc<Line>,
+    id: EndpointId,
+    ticket: u64,
+}
+
+impl Place {
+    /// Where this connection stands; with `claim` a connection whose turn it is starts asking.
+    fn turn(&self, claim: bool) -> Turn {
+        let mut state = self.line.lock();
+        if state.newest.get(&self.id) != Some(&self.ticket) {
+            return Turn::Replaced;
+        }
+        match state.order.iter().position(|device| *device == self.id) {
+            Some(0) if state.asking.is_none_or(|ticket| ticket == self.ticket) => {
+                if claim {
+                    state.asking = Some(self.ticket);
+                }
+                Turn::Now
+            }
+            Some(ahead) => Turn::Ahead(ahead),
+            None => Turn::Replaced,
+        }
+    }
+
+    /// Waits for this connection's turn to ask the host. `false`: a newer connection of the same
+    /// device took the place over.
+    async fn wait_turn(&self) -> bool {
+        let mut changes = self.line.changed.subscribe();
+        loop {
+            changes.borrow_and_update();
+            match self.turn(true) {
+                Turn::Now => return true,
+                Turn::Replaced => return false,
+                Turn::Ahead(_) => {}
+            }
+            if changes.changed().await.is_err() {
+                return false;
+            }
+        }
+    }
+}
+
+impl Drop for Place {
+    fn drop(&mut self) {
+        let mut state = self.line.lock();
+        let before = state.waiting();
+        if state.asking == Some(self.ticket) {
+            state.asking = None;
+        }
+        if state.newest.get(&self.id) == Some(&self.ticket) {
+            state.newest.remove(&self.id);
+            state.order.retain(|device| *device != self.id);
+        }
+        let after = state.waiting();
+        drop(state);
+        self.line.changed(before, after);
+    }
+}
+
 /// Admission check on every incoming connection.
 #[derive(Debug)]
 pub struct AccessHook {
     list: AccessList,
     approver: Option<Arc<dyn Approver>>,
-    /// At most one new device waits for approval at a time. The rest are rejected
-    /// right away: so a stranger with a ticket cannot flood the host with questions,
-    /// and the time to answer counts from the moment the question is shown.
-    pending: Arc<Semaphore>,
+    /// New devices wait here for the host's answer, one question at a time.
+    line: Arc<Line>,
     /// Devices the host rejected in this session: we do not ask again.
     denied: Arc<RwLock<BTreeSet<EndpointId>>>,
-    /// Decisions about new devices, for the interface.
+    /// Decisions about new devices and the length of the line, for the interface.
     events: EventSink,
 }
 
@@ -419,15 +586,23 @@ impl AccessHook {
         Self {
             list,
             approver,
-            pending: Arc::new(Semaphore::new(1)),
+            line: Arc::new(Line::new(APPROVE_QUEUE, EventSink::default())),
             denied: Arc::default(),
             events: EventSink::default(),
         }
     }
 
-    /// Report decisions about new devices ([`TunnelEvent::Access`]).
+    /// Report decisions about new devices ([`TunnelEvent::Access`]) and the length of the line
+    /// ([`TunnelEvent::Queue`]).
     pub fn with_events(mut self, events: EventSink) -> Self {
+        self.line = Arc::new(Line::new(self.line.limit, events.clone()));
         self.events = events;
+        self
+    }
+
+    /// How many devices may wait behind the one being asked ([`APPROVE_QUEUE`] by default).
+    pub fn with_queue_limit(mut self, limit: usize) -> Self {
+        self.line = Arc::new(Line::new(limit, self.events.clone()));
         self
     }
 
@@ -489,20 +664,68 @@ impl AccessHook {
             self.report(&id, None, AccessDecision::AlreadyDenied);
             return reject(RejectReason::Denied);
         }
-        let Ok(_permit) = self.pending.clone().try_acquire_owned() else {
+        let Some(place) = self.line.join(id) else {
             info!(
-                "устройство {} отклонено: вы ещё не ответили на вопрос о другом устройстве",
-                wire::short_id(&id)
+                "устройство {} отклонено: в очереди к вам уже {} устройств",
+                wire::short_id(&id),
+                self.line.limit
             );
             self.report(&id, None, AccessDecision::Busy);
             return reject(RejectReason::Busy);
         };
-        // While we waited, this device may have been approved or rejected (a second connection).
+        // The place is given up when this returns: the next device in line is asked at once.
+        self.ask_in_turn(conn, approver.as_ref(), &place).await
+    }
+
+    /// Waits for the device's turn in the line, then asks the host.
+    async fn ask_in_turn(
+        &self,
+        conn: &Connection,
+        approver: &dyn Approver,
+        place: &Place,
+    ) -> AfterHandshakeOutcome {
+        let id = conn.remote_id();
+        if let Turn::Ahead(ahead) = place.turn(false) {
+            info!(
+                "устройство {} ждёт в очереди, впереди: {ahead}",
+                wire::short_id(&id)
+            );
+        }
+        let turn = tokio::select! {
+            turn = place.wait_turn() => turn,
+            // Cancelled on the guest's side or lost: out of the line, nobody has to answer.
+            _ = conn.closed() => {
+                info!(
+                    "устройство {} ушло из очереди, не дождавшись вопроса",
+                    wire::short_id(&id)
+                );
+                self.report(&id, None, AccessDecision::GuestLeft);
+                return reject(RejectReason::Timeout);
+            }
+        };
+        if !turn {
+            info!(
+                "устройство {} подключилось заново: место в очереди перешло новому подключению",
+                wire::short_id(&id)
+            );
+            return reject(RejectReason::Timeout);
+        }
+        // While it waited, this device may have been let in or turned away (an earlier connection
+        // of it), and the room may have filled up.
         if self.list.is_allowed(&id) {
             return AfterHandshakeOutcome::Accept;
         }
         if self.is_denied(&id) {
             return reject(RejectReason::Denied);
+        }
+        if self.list.gate().is_full_for(&id) {
+            let max = self.list.gate().limit();
+            info!(
+                "устройство {} отклонено: пока оно ждало, комната заполнилась ({max} из {max})",
+                wire::short_id(&id)
+            );
+            self.report(&id, None, AccessDecision::RoomFull);
+            return reject(RejectReason::RoomFull { max });
         }
         // Who is knocking: the guest has already sent a hello with a nickname, read it before asking.
         let intro = read_intro(conn).await;
@@ -781,5 +1004,107 @@ mod tests {
         assert!(!list.remember_nickname(&stranger, "Mallory").unwrap());
         assert!(!list.is_allowed(&stranger));
         assert_eq!(list.nickname(&stranger), None);
+    }
+
+    /// A line that records its [`TunnelEvent::Queue`] reports.
+    fn line(limit: usize) -> (Arc<Line>, Arc<Mutex<Vec<u32>>>) {
+        let reports: Arc<Mutex<Vec<u32>>> = Arc::default();
+        let sink = EventSink::new({
+            let reports = reports.clone();
+            move |event| {
+                if let TunnelEvent::Queue { waiting } = event {
+                    reports.lock().unwrap().push(waiting);
+                }
+            }
+        });
+        (Arc::new(Line::new(limit, sink)), reports)
+    }
+
+    fn device() -> EndpointId {
+        SecretKey::generate().public()
+    }
+
+    #[test]
+    fn line_asks_in_arrival_order_one_at_a_time() {
+        let (line, reports) = line(8);
+        let (a, b, c) = (device(), device(), device());
+        let first = line.join(a).unwrap();
+        let second = line.join(b).unwrap();
+        let third = line.join(c).unwrap();
+        assert_eq!(first.turn(true), Turn::Now);
+        assert_eq!(second.turn(true), Turn::Ahead(1));
+        assert_eq!(third.turn(true), Turn::Ahead(2));
+
+        // The answer about the first device gives its place up: the second one is next.
+        drop(first);
+        assert_eq!(second.turn(true), Turn::Now);
+        assert_eq!(third.turn(false), Turn::Ahead(1));
+        drop(second);
+        drop(third);
+        assert_eq!(line.lock().order.len(), 0);
+        // Behind the one being asked: 1, 2, then down to nobody.
+        assert_eq!(*reports.lock().unwrap(), vec![1, 2, 1, 0]);
+    }
+
+    #[test]
+    fn a_device_that_dials_again_keeps_its_place() {
+        let (line, reports) = line(8);
+        let (a, b) = (device(), device());
+        let _first = line.join(a).unwrap();
+        let old = line.join(b).unwrap();
+        let new = line.join(b).unwrap();
+        // One place per device: the line did not grow, the old connection gave its place up.
+        assert_eq!(line.lock().order.len(), 2);
+        assert_eq!(old.turn(false), Turn::Replaced);
+        assert_eq!(new.turn(false), Turn::Ahead(1));
+        // The old connection leaving does not take the device out of the line.
+        drop(old);
+        assert_eq!(new.turn(false), Turn::Ahead(1));
+        assert_eq!(*reports.lock().unwrap(), vec![1]);
+    }
+
+    #[test]
+    fn a_device_asked_about_now_is_not_asked_twice() {
+        let (line, _) = line(8);
+        let a = device();
+        let asked = line.join(a).unwrap();
+        assert_eq!(asked.turn(true), Turn::Now);
+        // The guest dialed again while the host was looking at the question: the new connection
+        // waits for that answer instead of a second question.
+        let again = line.join(a).unwrap();
+        assert_eq!(again.turn(true), Turn::Ahead(0));
+        drop(asked);
+        assert_eq!(again.turn(true), Turn::Now);
+    }
+
+    #[test]
+    fn full_line_turns_away_one_more_device() {
+        let (line, _) = line(2);
+        let places: Vec<_> = (0..3).map(|_| line.join(device()).unwrap()).collect();
+        // One being asked and two waiting: the next device gets no place…
+        assert!(line.join(device()).is_none());
+        // …but a device already in line can always dial again.
+        let again = line.join(places[2].id);
+        assert!(again.is_some());
+        drop(places);
+        // A place is free again.
+        assert!(line.join(device()).is_some());
+    }
+
+    #[tokio::test]
+    async fn the_next_device_is_woken_as_soon_as_a_place_frees_up() {
+        let (line, _) = line(8);
+        let first = line.join(device()).unwrap();
+        assert!(first.wait_turn().await);
+        let second = line.join(device()).unwrap();
+        let waiting = tokio::spawn(async move { second.wait_turn().await });
+        tokio::time::sleep(Duration::from_millis(50)).await;
+        assert!(!waiting.is_finished(), "asked before the first answer");
+        drop(first);
+        let turn = tokio::time::timeout(Duration::from_secs(2), waiting)
+            .await
+            .expect("the second device was not woken")
+            .unwrap();
+        assert!(turn);
     }
 }

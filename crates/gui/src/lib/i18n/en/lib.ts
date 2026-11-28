@@ -58,7 +58,7 @@ export const lib: Translated<typeof ruLib> = {
   "journal.access.denied": "You declined player {who}.",
   "journal.access.alreadyDenied": "Player {who} is asking for access again. They were already declined.",
   "journal.access.promptsOff": "Player {who} was declined: new devices are not accepted.",
-  "journal.access.busy": "Player {who} was declined: you are still answering another request.",
+  "journal.access.busy": "Player {who} was declined: too many players are already waiting in line.",
   "journal.access.timeout": "You did not answer in time. Player {who} was declined.",
   "journal.access.guestLeft": "Player {who} left without waiting for an answer.",
   "journal.access.roomFull": "Player {who} could not join: the room has no free slots.",
